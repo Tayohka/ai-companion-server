@@ -19,7 +19,7 @@ if not GEMINI_API_KEY:
 genai.configure(api_key=GEMINI_API_KEY)
 
 # Initialize the Gemini Pro model for conversational chat
-model = genai.GenerativeModel('gemini-pro')
+model = genai.GenerativeModel('gemini-1.0-pro')
 chat = model.start_chat(history=[]) # Start a chat session to maintain context
 
 @app.route('/chat', methods=['POST'])
