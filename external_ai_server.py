@@ -17,17 +17,17 @@ if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY environment variable not set. Please set it or hardcode it for local use.")
 
 genai.configure(api_key=GEMINI_API_KEY)
-try:
-    print("--- Listing available Gemini models (DEBUG INFO) ---")
-    for m in genai.list_models():
-        # Check if the model supports content generation (for chat)
-        if 'generateContent' in m.supported_generation_methods:
-            print(f"Model Name: {m.name}, Supported Methods: {m.supported_generation_methods}")
-    print("--- End of Model List ---")
-except Exception as e:
-    print(f"Error while trying to list models: {e}")
+#try:
+#    print("--- Listing available Gemini models (DEBUG INFO) ---")
+#    for m in genai.list_models():
+#        # Check if the model supports content generation (for chat)
+#        if 'generateContent' in m.supported_generation_methods:
+#            print(f"Model Name: {m.name}, Supported Methods: {m.supported_generation_methods}")
+#    print("--- End of Model List ---")
+#except Exception as e:
+#    print(f"Error while trying to list models: {e}")
 # Initialize the Gemini Pro model for conversational chat
-model = genai.GenerativeModel('gemini-1.0-pro')
+model = genai.GenerativeModel('models/gemini-1.5-flash')
 chat = model.start_chat(history=[]) # Start a chat session to maintain context
 
 @app.route('/chat', methods=['POST'])
