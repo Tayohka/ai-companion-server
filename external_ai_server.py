@@ -3,33 +3,25 @@ import google.generativeai as genai
 
 app = Flask(__name__)
 
-# Safely check for the 'tool' decorator
-tool = getattr(genai, "tool", None)
-
-# Initialize model
+# Configure Gemini model
 genai.configure(api_key="AIzaSyDveJ_WAvjV6-QdbVRO4XYqsDpfp5OizdM")
 model = genai.GenerativeModel("models/gemini-1.5-flash")
 
-# Optional tool-decorated function (only if available)
-if tool:
-    @tool
-    def echo_tool(input_text: str) -> str:
-        return f"Echo: {input_text}"
-
-@app.route("/ask", methods=["POST"])
-def ask_ai():
-    data = request.json
-    user_input = data.get("input", "")
-
-    if not user_input:
-        return jsonify({"error": "No input received"}), 400
-
+@app.route("/chat", methods=["POST"])
+def chat():
     try:
+        data = request.get_json()
+        user_input = data.get("owner_message")  # Match key from LSL script
+
+        if not user_input:
+            return jsonify({"error": "Missing owner_message"}), 400
+
         response = model.generate_content(user_input)
-        return jsonify({"response": response.text})
+        return response.text, 200
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Required for Gunicorn entry point
+# Make sure Gunicorn finds this
 if __name__ == "__main__":
     app.run(debug=True)
