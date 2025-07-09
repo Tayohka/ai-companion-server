@@ -1,6 +1,7 @@
 # external_ai_server.py (Updated with a 'get_current_datetime' tool for real-time date/time)
 from flask import Flask, request, jsonify
 import google.generativeai as genai
+print(dir(genai))  # This will show what’s actually available in the deployed SDK
 from google.generativeai import GenerativeModel, tool # Import 'tool' decorator
 import os
 import urllib.parse
