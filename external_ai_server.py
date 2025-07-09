@@ -6,11 +6,11 @@ from datetime import datetime
 app = Flask(__name__)
 
 # --- Configuration ---
-genai.configure(api_key="YOUR_GEMINI_API_KEY")
-model = genai.GenerativeModel("gemini-pro")
+genai.configure(api_key="AIzaSyDveJ_WAvjV6-QdbVRO4XYqsDpfp5OizdM")
+model = genai.GenerativeModel("models/gemini-1.5-flash")
 
-GOOGLE_API_KEY = "YOUR_GOOGLE_API_KEY"
-SEARCH_ENGINE_ID = "YOUR_SEARCH_ENGINE_ID"
+GOOGLE_API_KEY = "AIzaSyA3H_LBsDvBJQZOwyY3C2P9hlFclpAUfBc"
+SEARCH_ENGINE_ID = "e1a9a5befafb84223"
 
 # --- Core Utilities ---
 
