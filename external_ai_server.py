@@ -6,13 +6,13 @@ from datetime import datetime
 app = Flask(__name__)
 
 # --- Configuration ---
-genai.configure(api_key="AIzaSyDveJ_WAvjV6-QdbVRO4XYqsDpfp5OizdM")
-model = genai.GenerativeModel("models/gemini-1.5-flash")
+genai.configure(api_key="YOUR_GEMINI_API_KEY")
+model = genai.GenerativeModel("gemini-pro")
 
-GOOGLE_API_KEY = "AIzaSyA3H_LBsDvBJQZOwyY3C2P9hlFclpAUfBc"
-SEARCH_ENGINE_ID = "e1a9a5befafb84223"
+GOOGLE_API_KEY = "YOUR_GOOGLE_API_KEY"
+SEARCH_ENGINE_ID = "YOUR_SEARCH_ENGINE_ID"
 
-# --- Utility Functions ---
+# --- Core Utilities ---
 
 def google_search(query):
     url = "https://www.googleapis.com/customsearch/v1"
@@ -22,18 +22,29 @@ def google_search(query):
         "q": query
     }
     response = requests.get(url, params=params).json()
-    items = response.get("items", [])
+    results = response.get("items", [])
 
-    # Basic relevance scan
-    for item in items:
-        snippet = item.get("snippet", "").lower()
+    # Scan for relevance using keyword priority
+    priority_keywords = [
+        "president", "date", "weather", "release date",
+        "game", "event", "switch 2", "happening", "today",
+        "current", "time", "announcement", "upcoming", "schedule"
+    ]
+    trusted_domains = ["cnn.com", "bbc.com", "nintendo.com", "ign.com", "reuters.com", "whitehouse.gov", "nytimes.com"]
+
+    for item in results:
         title = item.get("title", "").lower()
-        if any(kw in snippet + title for kw in ["president", "today is", "release date", "new game", "weather", "down", "status", "event", "happened", "news"]):
+        snippet = item.get("snippet", "").lower()
+        link = item.get("link", "")
+        domain = link.split("/")[2] if "/" in link else ""
+
+        # Confidence boost if trusted source + priority keyword match
+        if any(kw in title + snippet for kw in priority_keywords) and any(src in domain for src in trusted_domains):
             return f"{item['title']}\n{item['link']}\n{item.get('snippet', '')}"
 
-    if items:
-        # If nothing matched, return top result
-        top = items[0]
+    # Fallback to top result if nothing matched
+    if results:
+        top = results[0]
         return f"{top['title']}\n{top['link']}\n{top.get('snippet', '')}"
 
     return None
@@ -42,19 +53,22 @@ def ping_site(domain):
     try:
         response = requests.get(f"https://{domain}", timeout=5)
         if response.ok:
-            return f"The website '{domain}' is up and responding with status code {response.status_code}."
+            return f"The website '{domain}' is online. Status code: {response.status_code}."
         else:
-            return f"The website '{domain}' responded but with an error: status code {response.status_code}."
-    except requests.exceptions.RequestException:
+            return f"Site responded with error status code: {response.status_code}."
+    except Exception:
         return f"The website '{domain}' appears to be down or unreachable."
 
 def extract_domain(text):
-    # Simple domain extractor from a query like "is wikipedia.org up?"
     words = text.split()
     for word in words:
         if "." in word and not word.startswith("http"):
-            return word.strip("?.")
+            return word.strip(".,?!")
     return None
+
+def get_weather_stub():
+    # Placeholder — replace with live weather API later
+    return "It's partly cloudy with mild temperatures in Columbus, GA."
 
 def route_tool(query):
     query_lower = query.lower()
@@ -62,18 +76,22 @@ def route_tool(query):
     if "date" in query_lower or "today" in query_lower:
         return datetime.now().strftime("%A, %B %d, %Y")
 
-    elif "website" in query_lower and ("up" in query_lower or "down" in query_lower):
-        domain = extract_domain(query)
-        if domain:
-            return ping_site(domain)
-        return "I couldn't find a domain name in your question."
+    if "time" in query_lower:
+        return datetime.now().strftime("%I:%M %p %Z")
 
-    elif any(kw in query_lower for kw in ["president", "game release", "news", "weather", "event", "happening", "current", "latest"]):
+    if "website" in query_lower and ("up" in query_lower or "down" in query_lower):
+        domain = extract_domain(query)
+        return ping_site(domain) if domain else "I couldn’t find a domain name in your question."
+
+    if "weather" in query_lower or "temperature" in query_lower:
+        return get_weather_stub()
+
+    if any(k in query_lower for k in ["president", "news", "release", "event", "game", "switch 2", "who is", "what happened", "current"]):
         return google_search(query)
 
-    return None  # No special routing; fallback to Gemini
+    return None  # Route to Gemini normally
 
-# --- Main Chat Endpoint ---
+# --- Primary Route ---
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -85,14 +103,14 @@ def chat():
 
     try:
         dynamic_data = route_tool(user_input)
-        if dynamic_data:
-            # Gemini adds personality to real-time info
-            gemini_output = model.generate_content(f"User asked: '{user_input}'\nUse this information to answer:\n{dynamic_data}")
-            return gemini_output.text, 200
 
-        # No tool match — use Gemini directly
-        fallback_response = model.generate_content(user_input)
-        return fallback_response.text, 200
+        if dynamic_data:
+            gemini_reply = model.generate_content(f"User asked: '{user_input}'\nUse this information to respond naturally:\n{dynamic_data}")
+            return gemini_reply.text, 200
+
+        # Gemini handles non-dynamic questions
+        fallback = model.generate_content(user_input)
+        return fallback.text, 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
