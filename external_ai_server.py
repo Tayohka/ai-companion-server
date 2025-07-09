@@ -5,13 +5,14 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# --- Gemini setup ---
+# --- Configuration ---
 genai.configure(api_key="AIzaSyDveJ_WAvjV6-QdbVRO4XYqsDpfp5OizdM")
 model = genai.GenerativeModel("models/gemini-1.5-flash")
 
-# --- Google Programmable Search setup ---
 GOOGLE_API_KEY = "AIzaSyA3H_LBsDvBJQZOwyY3C2P9hlFclpAUfBc"
 SEARCH_ENGINE_ID = "e1a9a5befafb84223"
+
+# --- Utility Functions ---
 
 def google_search(query):
     url = "https://www.googleapis.com/customsearch/v1"
@@ -21,46 +22,77 @@ def google_search(query):
         "q": query
     }
     response = requests.get(url, params=params).json()
+    items = response.get("items", [])
 
-    for item in response.get("items", []):
-        if "date" in query.lower():
-            if "current date" in item['title'].lower() or "today is" in item['snippet'].lower():
-                return f"{item['title']}\n{item['link']}\n{item.get('snippet', '')}"
-        elif "president" in query.lower():
-            if "President" in item['title'] or "Joe Biden" in item['snippet']:
-                return f"{item['title']}\n{item['link']}\n{item.get('snippet', '')}"
+    # Basic relevance scan
+    for item in items:
+        snippet = item.get("snippet", "").lower()
+        title = item.get("title", "").lower()
+        if any(kw in snippet + title for kw in ["president", "today is", "release date", "new game", "weather", "down", "status", "event", "happened", "news"]):
+            return f"{item['title']}\n{item['link']}\n{item.get('snippet', '')}"
+
+    if items:
+        # If nothing matched, return top result
+        top = items[0]
+        return f"{top['title']}\n{top['link']}\n{top.get('snippet', '')}"
 
     return None
 
+def ping_site(domain):
+    try:
+        response = requests.get(f"https://{domain}", timeout=5)
+        if response.ok:
+            return f"The website '{domain}' is up and responding with status code {response.status_code}."
+        else:
+            return f"The website '{domain}' responded but with an error: status code {response.status_code}."
+    except requests.exceptions.RequestException:
+        return f"The website '{domain}' appears to be down or unreachable."
 
+def extract_domain(text):
+    # Simple domain extractor from a query like "is wikipedia.org up?"
+    words = text.split()
+    for word in words:
+        if "." in word and not word.startswith("http"):
+            return word.strip("?.")
+    return None
 
-def is_fresh_query(text):
-    keywords = ["today", "date", "weather", "news", "current", "latest", "update"]
-    return any(word in text.lower() for word in keywords)
+def route_tool(query):
+    query_lower = query.lower()
+
+    if "date" in query_lower or "today" in query_lower:
+        return datetime.now().strftime("%A, %B %d, %Y")
+
+    elif "website" in query_lower and ("up" in query_lower or "down" in query_lower):
+        domain = extract_domain(query)
+        if domain:
+            return ping_site(domain)
+        return "I couldn't find a domain name in your question."
+
+    elif any(kw in query_lower for kw in ["president", "game release", "news", "weather", "event", "happening", "current", "latest"]):
+        return google_search(query)
+
+    return None  # No special routing; fallback to Gemini
+
+# --- Main Chat Endpoint ---
 
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json()
-    user_input = data.get("owner_message", "")
+    user_input = data.get("owner_message", "").strip()
 
     if not user_input:
         return jsonify({"error": "Missing input"}), 400
 
     try:
-        # Check for freshness needs
-        if is_fresh_query(user_input):
-            # Get fresh info from Google Search
-            search_result = google_search(user_input)
-            if search_result:
-                # Summarize result with Gemini
-                gemini_response = model.generate_content(f"Summarize this for a user in Second Life:\n\n{search_result}")
-                return gemini_response.text, 200
-            else:
-                return "I couldn’t find anything up-to-date on that topic right now.", 200
+        dynamic_data = route_tool(user_input)
+        if dynamic_data:
+            # Gemini adds personality to real-time info
+            gemini_output = model.generate_content(f"User asked: '{user_input}'\nUse this information to answer:\n{dynamic_data}")
+            return gemini_output.text, 200
 
-        # For normal questions, use Gemini directly
-        response = model.generate_content(user_input)
-        return response.text, 200
+        # No tool match — use Gemini directly
+        fallback_response = model.generate_content(user_input)
+        return fallback_response.text, 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
