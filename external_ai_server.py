@@ -7,8 +7,8 @@ app = Flask(__name__)
 tool = getattr(genai, "tool", None)
 
 # Initialize model
-genai.configure(api_key="YOUR_API_KEY")
-model = genai.GenerativeModel("gemini-pro")
+genai.configure(api_key="AIzaSyDveJ_WAvjV6-QdbVRO4XYqsDpfp5OizdM")
+model = genai.GenerativeModel("models/gemini-1.5-flash")
 
 # Optional tool-decorated function (only if available)
 if tool:
