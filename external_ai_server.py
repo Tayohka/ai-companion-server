@@ -20,15 +20,19 @@ def google_search(query):
         "cx": SEARCH_ENGINE_ID,
         "q": query
     }
+    response = requests.get(url, params=params).json()
 
-    response = requests.get(url, params=params)
-    data = response.json()
+    for item in response.get("items", []):
+        if "date" in query.lower():
+            if "current date" in item['title'].lower() or "today is" in item['snippet'].lower():
+                return f"{item['title']}\n{item['link']}\n{item.get('snippet', '')}"
+        elif "president" in query.lower():
+            if "President" in item['title'] or "Joe Biden" in item['snippet']:
+                return f"{item['title']}\n{item['link']}\n{item.get('snippet', '')}"
 
-    if "items" in data:
-        top_result = data["items"][0]
-        summary = f"Title: {top_result['title']}\nLink: {top_result['link']}\nSnippet: {top_result.get('snippet', '')}"
-        return summary
     return None
+
+
 
 def is_fresh_query(text):
     keywords = ["today", "date", "weather", "news", "current", "latest", "update"]
